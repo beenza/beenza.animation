@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<project name="BeenzaAnimation" default="main" basedir=".">
+	
+	<property file="./build.properties" />
+	<taskdef resource="flexTasks.tasks" classpath="${FLEX_HOME}/ant/lib/flexTasks.jar" />
+	
+	<target name="main" depends="clean, compile, inject-asdoc" />
+
+	<target name="clean" depends="clean-temp-asdocs">
+		<delete failonerror="false">
+			<fileset dir="${basedir}/bin">
+				<include name="${ant.project.name}.swc" />
+			</fileset>
+		</delete>
+	</target>
+	
+	<target name="compile" depends="clean" description="Compile SWC">
+		<echo message="Compiling ${ant.project.name}.swc" />
+		<compc fork="true" output="${basedir}/bin/${ant.project.name}.swc">
+		    <source-path path-element="${basedir}/src"/>
+		    <include-sources dir="${basedir}/src" includes="**/*.as **/*.mxml" />
+		</compc>
+	</target>
+
+	<target name="inject-asdoc" depends="clean-temp-asdocs" description="Updates SWC with ASDoc XML">
+		<echo message="Compiling ASDoc for ${ant.project.name}.swc" />
+		<asdoc output="${basedir}/tempDoc" lenient="true" failonerror="true" keep-xml="true" skip-xsl="true" fork="true">
+		    <compiler.source-path path-element="${basedir}/src" />
+			<doc-sources path-element="${basedir}/src" />
+		</asdoc>
+		<zip destfile="${basedir}/bin/${ant.project.name}.swc" update="true">
+		    <zipfileset dir="${basedir}/tempDoc/tempdita" prefix="docs">
+			    <include name="*.*" />
+				<exclude name="ASDoc_Config.xml" />
+				<exclude name="overviews.xml" />
+		    </zipfileset>
+		</zip>
+		<antcall target="clean-temp-asdocs" />
+	</target>
+
+	<target name="clean-temp-asdocs">
+		<delete dir="${basedir}/tempDoc" failonerror="false" includeEmptyDirs="true" />
+	</target>
+
+</project>
