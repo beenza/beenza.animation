@@ -1,8 +1,8 @@
-AS3CacheAnimation Library
+BeenzaAnimation Library
 =========================
 
-AS3CacheAnimation is a flash library, for cache animation in MovieClip.
-Source code is available at http://github.com/beenza/as3cacheanimation
+BeenzaAnimation is a flash library, for cache animation in MovieClip.
+Source code is available at http://github.com/beenza/beenza.animation
 
 Usage
 =====
@@ -25,4 +25,4 @@ Compiling
 Licensing
 =========
 
-AS3CacheAnimation is distributed under MIT License. The MIT License is included in this source tree in the file LICENSE.
+BeenzaAnimation is distributed under MIT License. The MIT License is included in this source tree in the file LICENSE.
