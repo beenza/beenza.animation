@@ -13,55 +13,26 @@ package ru.beenza.animation {
 		
 		private var mc:MovieClip;
 		private var bmp:Bitmap;
-		private var bmd:BitmapData;
-		private var buffer:BitmapData;
 		private var frameBounds:Vector.<Rectangle>;
 		private var bufferFrames:Vector.<BitmapData>;
-		
-		private var mapFrames:Vector.<uint>;
-		private var currentMapFrameIndex:uint;
 		
 		private var _currentFrame:uint;
 		private var _totalFrames:uint;
 		
 		/**
-		 * Create Sprite with Bitmap and vector of cached BitmapData from MovieClip
+		 * Create Sprite with Bitmap and Vector of cached BitmapData from source MovieClip.
 		 * @param mc MovieClip for caching
-		 * @param mapFrames map of frames for easy to manage a sequence of frames
 		 */
-		public function CachedAnimationSprite(mc:MovieClip, mapFrames:Vector.<uint> = null) {
+		public function CachedAnimationSprite(mc:MovieClip) {
 			super();
 			this.mc = mc;
-			this.mapFrames = mapFrames;
 			init();
 		}
 		
 		private function init():void {
-			var bounds:Rectangle;
-			var bmd:BitmapData;
-			const m:Matrix = new Matrix();
-			
 			_totalFrames = mc.totalFrames;
 			frameBounds = new Vector.<Rectangle>(totalFrames, true);
 			bufferFrames = new Vector.<BitmapData>(totalFrames, true);
-			
-			// caching frames
-			for (var i:uint = 0; i < totalFrames; ++i) {
-				mc.gotoAndStop(i + 1);
-				
-				bounds = mc.getBounds(mc);
-				bounds.width = Math.ceil(bounds.width);
-				bounds.height = Math.ceil(bounds.height);
-				frameBounds[i] = bounds;
-				
-				bmd = new BitmapData(bounds.width, bounds.height, true, 0);
-				m.tx = -bounds.x;
-				m.ty = -bounds.y;
-				bmd.draw(mc, m);
-				bufferFrames[i] = bmd;
-			}
-			
-			mc = null;
 			
 			// create visible part
 			bmp = new Bitmap(null, PixelSnapping.AUTO, true);
@@ -72,9 +43,42 @@ package ru.beenza.animation {
 		}
 		
 		/**
-		 * Render current frame
+		 * Cache specific frame.
+		 * @param frame num frame in MoveClip, first frame is zero
+		 */		
+		private function cacheFrame(frame:uint):void {
+			if (bufferFrames[frame]) return;
+			
+			var bounds:Rectangle;
+			var bmd:BitmapData;
+			const m:Matrix = new Matrix();
+			
+			mc.gotoAndStop(frame + 1);
+			
+			bounds = mc.getBounds(mc);
+			var xOffset:Number = bounds.x - Math.floor(bounds.x);
+			var yOffset:Number = bounds.y - Math.floor(bounds.y);
+			bounds.x = Math.round( bounds.x - xOffset );
+			bounds.y = Math.round( bounds.y - yOffset );
+			bounds.width = Math.ceil( bounds.width + xOffset );
+			bounds.height = Math.ceil( bounds.height + yOffset );
+			frameBounds[frame] = bounds;
+			
+			bmd = new BitmapData(bounds.width, bounds.height, true, 0);
+			m.tx = -bounds.x;
+			m.ty = -bounds.y;
+			bmd.draw(mc, m);
+			bufferFrames[frame] = bmd;
+		}
+		
+		/**
+		 * Render current frame.
 		 */
 		private function render():void {
+			if (!bufferFrames[currentFrame]) {
+				cacheFrame(currentFrame);
+			}
+			
 			const bounds:Rectangle = frameBounds[currentFrame];
 			bmp.bitmapData = bufferFrames[currentFrame];
 			bmp.x = bounds.x;
@@ -88,22 +92,10 @@ package ru.beenza.animation {
 		//--------------------------------------------------------------------------
 		
 		/**
-		 * Go to real next frame
+		 * Go to next frame.
 		 */
 		public function nextFrame():void {
 			currentFrame = (currentFrame + 1) % totalFrames;
-		}
-		
-		/**
-		 * Go to next frame of map (Looped). If map not set, then nextFrame() used.
-		 */
-		public function nextMapFrame():void {
-			if (mapFrames) {
-				currentMapFrameIndex = (currentMapFrameIndex + 1) % mapFrames.length;
-				currentFrame = mapFrames[currentMapFrameIndex];
-			} else {
-				nextFrame();
-			}
 		}
 		
 		//--------------------------------------------------------------------------
