@@ -5,6 +5,8 @@ package ru.beenza.animation {
 	import flash.display.MovieClip;
 	import flash.display.PixelSnapping;
 	import flash.display.Sprite;
+	import flash.display.StageQuality;
+	import flash.events.Event;
 	import flash.geom.Matrix;
 	import flash.geom.Point;
 	import flash.geom.Rectangle;
@@ -38,6 +40,13 @@ package ru.beenza.animation {
 			bmp = new Bitmap(null, PixelSnapping.AUTO, true);
 			addChild(bmp);
 			
+			// waiting added to stage
+			addEventListener(Event.ADDED_TO_STAGE, onAddedToStage);
+		}
+		
+		private function onAddedToStage(event:Event):void {
+			removeEventListener(Event.ADDED_TO_STAGE, onAddedToStage);
+			
 			// render first frame
 			render();
 		}
@@ -56,19 +65,29 @@ package ru.beenza.animation {
 			mc.gotoAndStop(frame + 1);
 			
 			bounds = mc.getBounds(mc);
-			var xOffset:Number = bounds.x - Math.floor(bounds.x);
-			var yOffset:Number = bounds.y - Math.floor(bounds.y);
+			const xOffset:Number = bounds.x - Math.floor(bounds.x);
+			const yOffset:Number = bounds.y - Math.floor(bounds.y);
 			bounds.x = Math.round( bounds.x - xOffset );
 			bounds.y = Math.round( bounds.y - yOffset );
 			bounds.width = Math.ceil( bounds.width + xOffset );
 			bounds.height = Math.ceil( bounds.height + yOffset );
 			frameBounds[frame] = bounds;
 			
+			var prevQuality:String;
+			if (stage && stage.quality != StageQuality.BEST) {
+				prevQuality = stage.quality;
+				stage.quality = StageQuality.BEST;
+			}
+			
 			bmd = new BitmapData(bounds.width, bounds.height, true, 0);
 			m.tx = -bounds.x;
 			m.ty = -bounds.y;
 			bmd.draw(mc, m);
 			bufferFrames[frame] = bmd;
+			
+			if (prevQuality && stage) {
+				stage.quality = prevQuality;
+			}
 		}
 		
 		/**
