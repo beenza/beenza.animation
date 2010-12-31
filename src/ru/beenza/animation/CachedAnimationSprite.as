@@ -20,6 +20,7 @@ package ru.beenza.animation {
 		
 		private var _currentFrame:uint;
 		private var _totalFrames:uint;
+		private var _flipX:Boolean;
 		
 		/**
 		 * Create Sprite with Bitmap and Vector of cached BitmapData from source MovieClip.
@@ -33,8 +34,7 @@ package ru.beenza.animation {
 		
 		private function init():void {
 			_totalFrames = mc.totalFrames;
-			frameBounds = new Vector.<Rectangle>(totalFrames, true);
-			bufferFrames = new Vector.<BitmapData>(totalFrames, true);
+			clearCache();
 			
 			// create visible part
 			bmp = new Bitmap(null, PixelSnapping.AUTO, true);
@@ -51,6 +51,11 @@ package ru.beenza.animation {
 			render();
 		}
 		
+		private function clearCache():void {
+			frameBounds = new Vector.<Rectangle>(totalFrames, true);
+			bufferFrames = new Vector.<BitmapData>(totalFrames, true);
+		}
+		
 		/**
 		 * Cache specific frame.
 		 * @param frame num frame in MoveClip, first frame is zero
@@ -64,27 +69,39 @@ package ru.beenza.animation {
 			
 			mc.gotoAndStop(frame + 1);
 			
+			const toScaleX:Number = mc.scaleX;
+			const toScaleY:Number = mc.scaleY;
+			
 			bounds = mc.getBounds(mc);
+			bounds.x *= toScaleX;
+			bounds.y *= toScaleY;
+			bounds.width *= toScaleX;
+			bounds.height *= toScaleY;
+			
 			const xOffset:Number = bounds.x - Math.floor(bounds.x);
 			const yOffset:Number = bounds.y - Math.floor(bounds.y);
 			bounds.x = Math.round( bounds.x - xOffset );
 			bounds.y = Math.round( bounds.y - yOffset );
-			bounds.width = Math.ceil( bounds.width + xOffset );
-			bounds.height = Math.ceil( bounds.height + yOffset );
+			bounds.width = Math.abs( Math.ceil( bounds.width + xOffset ) );
+			bounds.height = Math.abs( Math.ceil( bounds.height + yOffset ) );
 			frameBounds[frame] = bounds;
 			
+			// set stage quality to best for better caching
 			var prevQuality:String;
 			if (stage && stage.quality != StageQuality.BEST) {
 				prevQuality = stage.quality;
 				stage.quality = StageQuality.BEST;
 			}
 			
-			bmd = new BitmapData(bounds.width, bounds.height, true, 0);
-			m.tx = -bounds.x;
-			m.ty = -bounds.y;
-			bmd.draw(mc, m);
+			if (stage && bounds.width > 0 && bounds.height > 0) {
+				bmd = new BitmapData(bounds.width, bounds.height, true, 0);
+				m.scale(toScaleX, toScaleY);
+				m.translate(-bounds.x, -bounds.y);
+				bmd.draw(mc, m);
+			}
 			bufferFrames[frame] = bmd;
 			
+			// return back stage quality
 			if (prevQuality && stage) {
 				stage.quality = prevQuality;
 			}
@@ -117,6 +134,18 @@ package ru.beenza.animation {
 			currentFrame = (currentFrame + 1) % totalFrames;
 		}
 		
+		/**
+		 * Scale MovieClip
+		 * @param x scaleX
+		 * @param y scaleY
+		 */
+		public function scale(sx:Number, sy:Number):void {
+			if (Math.abs(sx) == mc.scaleX && Math.abs(sy) == mc.scaleY) return;
+			clearCache();
+			mc.scaleX = Math.abs(sx);
+			mc.scaleY = Math.abs(sy);
+		}
+		
 		//--------------------------------------------------------------------------
 		//
 		//  Getters / Setters
@@ -131,6 +160,12 @@ package ru.beenza.animation {
 		}
 		
 		public function get totalFrames():uint { return _totalFrames };
+		
+		public function get flipX():Boolean { return _flipX };
+		public function set flipX(value:Boolean):void {
+			_flipX = value;
+			scaleX = Math.abs(scaleX) * (value ? -1 : 1);
+		}
 		
 	}
 	
