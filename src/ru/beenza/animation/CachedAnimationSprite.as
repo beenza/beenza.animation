@@ -111,6 +111,8 @@ package ru.beenza.animation {
 		 * Render current frame.
 		 */
 		private function render():void {
+			if (!bufferFrames) return;
+			
 			if (!bufferFrames[currentFrame]) {
 				cacheFrame(currentFrame);
 			}
@@ -144,6 +146,23 @@ package ru.beenza.animation {
 			clearCache();
 			mc.scaleX = Math.abs(sx);
 			mc.scaleY = Math.abs(sy);
+		}
+		
+		public function destroy():void {
+			if (hasEventListener(Event.ADDED_TO_STAGE)) {
+				removeEventListener(Event.ADDED_TO_STAGE, onAddedToStage);
+			}
+			mc = null;
+			if (bmp && contains(bmp)) {
+				removeChild(bmp);
+				bmp.bitmapData = null;
+				bmp = null
+			}
+			frameBounds = null;
+			for each (var bmd:BitmapData in bufferFrames) {
+				if (bmd) bmd.dispose();
+			}
+			bufferFrames = null;
 		}
 		
 		//--------------------------------------------------------------------------
