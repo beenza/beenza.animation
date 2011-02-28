@@ -9,11 +9,10 @@ Usage
 	private var cachedMovieClip:CachedAnimationSprite;
 	...
 	var mc:MovieClip = new MyPerson();
-	var mapFrames:Vector.<uint> = Vector.<uint>([0, 1, 2, 3, 4]);
-	cachedMovieClip = new CachedAnimationSprite(mc, mapFrames);
+	cachedMovieClip = new CachedAnimationSprite(mc);
 	...
 	private function onEnterFrame(event:Event) {
-		cachedMovieClip.nextMapFrame();
+		cachedMovieClip.nextFrame();
 	}
 
 Compiling

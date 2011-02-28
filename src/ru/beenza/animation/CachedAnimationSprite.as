@@ -10,13 +10,14 @@ package ru.beenza.animation {
 	import flash.geom.Matrix;
 	import flash.geom.Point;
 	import flash.geom.Rectangle;
+	import flash.utils.Dictionary;
 	
 	public class CachedAnimationSprite extends Sprite {
 		
-		private var mc:MovieClip;
+		private var src:MovieClip;
 		private var bmp:Bitmap;
-		private var frameBounds:Vector.<Rectangle>;
-		private var bufferFrames:Vector.<BitmapData>;
+		private var frames:Vector.<FrameData>;
+		private var checkDuplicate:Boolean;
 		
 		private var _currentFrame:uint;
 		private var _totalFrames:uint;
@@ -24,16 +25,18 @@ package ru.beenza.animation {
 		
 		/**
 		 * Create Sprite with Bitmap and Vector of cached BitmapData from source MovieClip.
-		 * @param mc MovieClip for caching
+		 * @param src MovieClip for caching
+		 * @param checkDuplicate check duplicate previous frame when rendering
 		 */
-		public function CachedAnimationSprite(mc:MovieClip) {
+		public function CachedAnimationSprite(src:MovieClip, checkDuplicate:Boolean=false) {
 			super();
-			this.mc = mc;
+			this.src = src;
+			this.checkDuplicate = checkDuplicate;
 			init();
 		}
 		
 		private function init():void {
-			_totalFrames = mc.totalFrames;
+			_totalFrames = src.totalFrames;
 			clearCache();
 			
 			// create visible part
@@ -52,8 +55,7 @@ package ru.beenza.animation {
 		}
 		
 		private function clearCache():void {
-			frameBounds = new Vector.<Rectangle>(totalFrames, true);
-			bufferFrames = new Vector.<BitmapData>(totalFrames, true);
+			frames = new Vector.<FrameData>(totalFrames, true);
 		}
 		
 		/**
@@ -61,45 +63,78 @@ package ru.beenza.animation {
 		 * @param frame num frame in MoveClip, first frame is zero
 		 */		
 		private function cacheFrame(frame:uint):void {
-			if (bufferFrames[frame]) return;
+			if (frames[frame]) return;
 			
-			var bounds:Rectangle;
-			var bmd:BitmapData;
-			const m:Matrix = new Matrix();
+			src.gotoAndStop(frame + 1);
 			
-			mc.gotoAndStop(frame + 1);
+			// check changes
+			if (checkDuplicate) {
+				var i:int, mc:MovieClip, dict:Dictionary;
+				if (frame > 0 && frames && frames[frame - 1] && frames[frame - 1].dictMatrixes) {
+					var m1:Matrix, m2:Matrix;
+					dict = frames[frame - 1].dictMatrixes;
+					for (i = 0; i < src.numChildren; ++i) {
+						mc = src.getChildAt(i) as MovieClip;
+						if (mc in dict) {
+							m1 = mc.transform.matrix;
+							m2 = dict[mc];
+							if (m1.a != m2.a || m1.b != m2.b || m1.c != m2.c || m1.d != m2.d || m1.tx != m2.tx || m1.ty != m2.ty) {
+								break;
+							}
+						}
+					}
+					if (i == src.numChildren) {
+						frames[frame] = frames[frame - 1];
+						return;
+					}
+				}
+			}
 			
-			const toScaleX:Number = mc.scaleX;
-			const toScaleY:Number = mc.scaleY;
+			const toScaleX:Number = src.scaleX;
+			const toScaleY:Number = src.scaleY;
 			
-			bounds = mc.getBounds(mc);
-			bounds.x *= toScaleX;
-			bounds.y *= toScaleY;
-			bounds.width *= toScaleX;
-			bounds.height *= toScaleY;
+			const bounds:Rectangle = src.getBounds(src);
+			const p:Point = new Point(bounds.x * toScaleX, bounds.y * toScaleY);
+			var w:Number = bounds.width * toScaleX;
+			var h:Number = bounds.height * toScaleY;
 			
-			const xOffset:Number = bounds.x - Math.floor(bounds.x);
-			const yOffset:Number = bounds.y - Math.floor(bounds.y);
-			bounds.x = Math.round( bounds.x - xOffset );
-			bounds.y = Math.round( bounds.y - yOffset );
-			bounds.width = Math.abs( Math.ceil( bounds.width + xOffset ) );
-			bounds.height = Math.abs( Math.ceil( bounds.height + yOffset ) );
-			frameBounds[frame] = bounds;
+			const xOffset:Number = p.x - Math.floor(p.x);
+			const yOffset:Number = p.y - Math.floor(p.y);
+			p.x = Math.round( p.x - xOffset );
+			p.y = Math.round( p.y - yOffset );
+			w = Math.abs( Math.ceil( w + xOffset ) );
+			h = Math.abs( Math.ceil( h + yOffset ) );
 			
 			// set stage quality to best for better caching
 			var prevQuality:String;
-			if (stage && stage.quality != StageQuality.BEST) {
+			if (stage && (stage.quality != StageQuality.HIGH || stage.quality != StageQuality.BEST)) {
 				prevQuality = stage.quality;
-				stage.quality = StageQuality.BEST;
+				stage.quality = StageQuality.HIGH;
 			}
 			
 			if (stage && bounds.width > 0 && bounds.height > 0) {
-				bmd = new BitmapData(bounds.width, bounds.height, true, 0);
+				const bmd:BitmapData = new BitmapData(w, h, true, 0);
+				const m:Matrix = new Matrix();
 				m.scale(toScaleX, toScaleY);
-				m.translate(-bounds.x, -bounds.y);
-				bmd.draw(mc, m);
+				m.translate(-p.x, -p.y);
+				bmd.draw(src, m);
+				
+				const fd:FrameData = new FrameData();
+				fd.p = p;
+				fd.bmd = bmd;
+				
+				if (checkDuplicate) {
+					dict = new Dictionary();
+					for (i = 0; i < src.numChildren; ++i) {
+						mc = src.getChildAt(i) as MovieClip;
+						if (!mc) continue;
+						dict[mc] = mc.transform.matrix;
+					}
+					fd.dictMatrixes = dict;
+				}
+				
+				frames[frame] = fd;
 			}
-			bufferFrames[frame] = bmd;
 			
 			// return back stage quality
 			if (prevQuality && stage) {
@@ -111,16 +146,19 @@ package ru.beenza.animation {
 		 * Render current frame.
 		 */
 		private function render():void {
-			if (!bufferFrames) return;
+			if (!frames) return;
 			
-			if (!bufferFrames[currentFrame]) {
+			var fd:FrameData = frames[currentFrame];
+			if (!fd) {
 				cacheFrame(currentFrame);
+				fd = frames[currentFrame];
+			} else {
+				fd.dictMatrixes = null;
 			}
 			
-			const bounds:Rectangle = frameBounds[currentFrame];
-			bmp.bitmapData = bufferFrames[currentFrame];
-			bmp.x = bounds.x;
-			bmp.y = bounds.y;
+			bmp.bitmapData = fd.bmd;
+			bmp.x = fd.p.x;
+			bmp.y = fd.p.y;
 		}
 		
 		//--------------------------------------------------------------------------
@@ -142,27 +180,32 @@ package ru.beenza.animation {
 		 * @param y scaleY
 		 */
 		public function scale(sx:Number, sy:Number):void {
-			if (Math.abs(sx) == mc.scaleX && Math.abs(sy) == mc.scaleY) return;
+			if (Math.abs(sx) == src.scaleX && Math.abs(sy) == src.scaleY) return;
 			clearCache();
-			mc.scaleX = Math.abs(sx);
-			mc.scaleY = Math.abs(sy);
+			src.scaleX = Math.abs(sx);
+			src.scaleY = Math.abs(sy);
 		}
 		
 		public function destroy():void {
 			if (hasEventListener(Event.ADDED_TO_STAGE)) {
 				removeEventListener(Event.ADDED_TO_STAGE, onAddedToStage);
 			}
-			mc = null;
+			src = null;
 			if (bmp && contains(bmp)) {
 				removeChild(bmp);
 				bmp.bitmapData = null;
 				bmp = null
 			}
-			frameBounds = null;
-			for each (var bmd:BitmapData in bufferFrames) {
-				if (bmd) bmd.dispose();
+			for each (var fd:FrameData in frames) {
+				if (!fd) continue;
+				fd.p = null;
+				if (fd.bmd) {
+					fd.bmd.dispose();
+					fd.bmd = null;
+				}
+				fd.dictMatrixes = null;
 			}
-			bufferFrames = null;
+			frames = null;
 		}
 		
 		//--------------------------------------------------------------------------
@@ -187,5 +230,17 @@ package ru.beenza.animation {
 		}
 		
 	}
+	
+}
+
+import flash.display.BitmapData;
+import flash.geom.Point;
+import flash.utils.Dictionary;
+
+class FrameData {
+	
+	public var p:Point;
+	public var bmd:BitmapData;
+	public var dictMatrixes:Dictionary;
 	
 }
