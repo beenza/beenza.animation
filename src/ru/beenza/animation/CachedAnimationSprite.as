@@ -112,7 +112,7 @@ package ru.beenza.animation {
 				stage.quality = StageQuality.HIGH;
 			}
 			
-			if (stage && bounds.width > 0 && bounds.height > 0) {
+			if (w > 0 && h > 0) {
 				const bmd:BitmapData = new BitmapData(w, h, true, 0);
 				const m:Matrix = new Matrix();
 				m.scale(toScaleX, toScaleY);
@@ -148,10 +148,10 @@ package ru.beenza.animation {
 		private function render():void {
 			if (!frames) return;
 			
-			var fd:FrameData = frames[currentFrame];
+			var fd:FrameData = frames[_currentFrame];
 			if (!fd) {
-				cacheFrame(currentFrame);
-				fd = frames[currentFrame];
+				cacheFrame(_currentFrame);
+				fd = frames[_currentFrame];
 			} else {
 				fd.dictMatrixes = null;
 			}
@@ -171,7 +171,7 @@ package ru.beenza.animation {
 		 * Go to next frame.
 		 */
 		public function nextFrame():void {
-			currentFrame = (currentFrame + 1) % totalFrames;
+			currentFrame = (_currentFrame + 1) % _totalFrames;
 		}
 		
 		/**
@@ -216,7 +216,7 @@ package ru.beenza.animation {
 		
 		public function get currentFrame():uint { return _currentFrame };
 		public function set currentFrame(value:uint):void {
-			if (currentFrame == value || value > totalFrames - 1) return;
+			if (!stage || currentFrame == value || value > totalFrames - 1) return;
 			_currentFrame = value;
 			render();
 		}
